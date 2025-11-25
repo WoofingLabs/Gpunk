@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPunks 查询器（真实 .json 元数据）</title>
+    <title>GPunks 查询器（合约直接查询）</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background:#070808; color:white; font-family:system-ui,sans-serif; }
@@ -38,12 +38,12 @@
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
     <script>
-        const BASE_URI = "https://bafybeiam2yfk274nkndkks33k7exisutily5h5msbtpqp3wyrlxg2x4q5q.ipfs.w3s.link/";
         const CONTRACT = "0x145Af7ED86863F914652791b8A6028B92411baD4";
         const web3 = new Web3("https://gatelayer-mainnet.gatenode.cc/");
         const abi = [
             {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"}
+            {"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"internalType":"string"}],"stateMutability":"view","type":"function"}
         ];
         const nft = new web3.eth.Contract(abi, CONTRACT);
 
@@ -74,39 +74,53 @@
 
                 const grid = document.getElementById("grid");
 
-                ids.forEach(async (id) => {
-                    // 先请求 .json 元数据
-                    const jsonUrl = BASE_URI + id + ".json";
+                for (const id of ids) {
+                    // 直接调用合约的 tokenURI
+                    const uri = await nft.methods.tokenURI(id).call();
                     let imgUrl = "";
 
                     try {
-                        const resp = await fetch(jsonUrl);
-                        if (resp.ok) {
-                            const meta = await resp.json();
-                            imgUrl = meta.image;
-                            if (imgUrl.startsWith("ipfs://")) {
-                                imgUrl = "https://ipfs.io/ipfs/" + imgUrl.slice(7);
+                        if (uri) {
+                            // 如果 URI 是 .json，fetch 提取 image
+                            if (uri.endsWith('.json')) {
+                                const resp = await fetch(uri);
+                                if (resp.ok) {
+                                    const meta = await resp.json();
+                                    imgUrl = meta.image;
+                                    if (imgUrl.startsWith("ipfs://")) {
+                                        imgUrl = "https://ipfs.io/ipfs/" + imgUrl.slice(7);
+                                    }
+                                }
+                            } else {
+                                // 直接图片
+                                imgUrl = uri;
                             }
                         }
-                    } catch (e) { }
+                    } catch (e) { 
+                        console.error('Metadata fetch failed for', id, e);
+                        // 兜底：尝试 baseURI + id + .png（如果已知 baseURI）
+                        imgUrl = `https://bafybeiam2yfk274nkndkks33k7exisutily5h5msbtpqp3wyrlxg2x4q5q.ipfs.w3s.link/${id}.png`;
+                    }
 
-                    // 如果拿不到就直接用 baseURI + id.png 兜底
-                    if (!imgUrl) imgUrl = BASE_URI + id + ".png";
+                    if (!imgUrl) {
+                        imgUrl = `https://via.placeholder.com/500x500/111827/ffffff?text=%23${id}`;
+                    }
 
                     const div = document.createElement("div");
-                    div.className = "relative group overflow-hidden rounded-xl border border-blue-500/30 hover:border-green-400 transition-all";
+                    div.className = "relative group overflow-hidden rounded-xl border border-blue-500/30 hover:border-green-400 transition-all aspect-square";
                     div.innerHTML = `
                         <img src="${imgUrl}" alt="GPunks #${id}" loading="lazy"
                              class="w-full h-full object-cover bg-gray-900"
-                             onerror="this.src='https://via.placeholder.com/500x500/111827/ffffff?text=%23${id}'">
+                             onerror="this.src='https://via.placeholder.com/500x500/111827/ffffff?text=%23${id}'; this.onerror=null;">
                         <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-center opacity-0 group-hover:opacity-100 transition">
                             <span class="font-bold text-lg">#${id}</span>
                         </div>
                     `;
                     grid.appendChild(div);
-                });
+                }
 
             } catch (e) {
+                console.error(e);
                 document.getElementById("empty").classList.remove("hidden");
             } finally {
                 document.getElementById("loading").classList.add("hidden");
