@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>GPunks NFT 查询 & 转账</title>
+    <title>GPunks NFT 查询</title>
     <link rel="icon" type="image/png" href="https://woofinglabs.github.io/GdogToTheMoon/images/gdog_logo.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Changa+One&display=swap" rel="stylesheet" />
@@ -32,14 +32,14 @@
         <div class="container mx-auto px-6 py-5 flex justify-center items-center">
             <div class="flex items-center space-x-4">
                 <img src="https://woofinglabs.github.io/GdogToTheMoon/images/gdog_logo.png" alt="GPunks" class="w-12 h-12 rounded-full" />
-                <span class="font-display text-4xl text-primary">GPunks 查询 & 转账</span>
+                <span class="font-display text-4xl text-primary">GPunks 查询</span>
             </div>
         </div>
     </header>
 
     <main class="pt-28 pb-20 px-4">
         <div class="max-w-2xl mx-auto text-center mb-10">
-            <p class="text-light-gray text-lg mb-8">输入钱包地址，查看你持有的所有 GPunks，并可转账到任意地址</p>
+            <p class="text-light-gray text-lg mb-8">输入钱包地址，查看你持有的所有 GPunks</p>
             
             <div class="bg-dark/70 backdrop-blur-md border border-primary/30 rounded-2xl p-6 shadow-2xl">
                 <div class="flex flex-col sm:flex-row gap-4">
@@ -56,29 +56,6 @@
                         查询 NFT
                     </button>
                 </div>
-            </div>
-
-            <div id="transferSection" class="hidden mt-8 bg-dark/70 backdrop-blur-md border border-primary/30 rounded-2xl p-6 shadow-2xl">
-                <h3 class="text-2xl font-bold mb-4 text-center">转账 NFT</h3>
-                <div class="flex flex-col sm:flex-row gap-4 mb-4">
-                    <input 
-                        id="transferTo" 
-                        type="text" 
-                        placeholder="目标地址 0x..."
-                        class="flex-1 px-6 py-4 bg-dark/80 border border-primary/40 rounded-xl text-white placeholder-light-gray/50 focus:outline-none"
-                    />
-                    <select id="tokenToTransfer" class="px-6 py-4 bg-dark/80 border border-primary/40 rounded-xl text-white">
-                        <option value="">选择 NFT ID</option>
-                    </select>
-                    <button 
-                        id="transferBtn" 
-                        class="px-10 py-4 bg-secondary hover:bg-secondary/90 rounded-xl font-bold text-dark transition shadow-lg"
-                        disabled
-                    >
-                        执行转账
-                    </button>
-                </div>
-                <p class="text-light-gray text-sm text-center">注意：转账需连接钱包确认，Gas 费用由发送者承担</p>
             </div>
         </div>
 
@@ -116,12 +93,8 @@
         const contract = new web3.eth.Contract([
             {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"internalType":"string"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"safeTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"}
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"internalType":"string"}],"stateMutability":"view","type":"function"}
         ], CONTRACT);
-
-        let currentAccount = null;
-        let tokenIds = [];
 
         const input = document.getElementById('walletAddress');
         const btn = document.getElementById('queryBtn');
@@ -130,16 +103,9 @@
         const nftList = document.getElementById('nftList');
         const totalCount = document.getElementById('totalCount');
         const empty = document.getElementById('empty');
-        const transferSection = document.getElementById('transferSection');
-        const transferTo = document.getElementById('transferTo');
-        const tokenSelect = document.getElementById('tokenToTransfer');
-        const transferBtn = document.getElementById('transferBtn');
 
         input.addEventListener('keypress', e => e.key === 'Enter' && query());
         btn.addEventListener('click', query);
-        tokenSelect.addEventListener('change', () => transferBtn.disabled = !tokenSelect.value || !transferTo.value.trim());
-
-        transferTo.addEventListener('input', () => transferBtn.disabled = !tokenSelect.value || !transferTo.value.trim());
 
         async function query() {
             let addr = input.value.trim();
@@ -152,8 +118,6 @@
             result.classList.add('hidden');
             nftList.innerHTML = '';
             empty.classList.add('hidden');
-            tokenIds = [];
-            tokenSelect.innerHTML = '<option value="">选择 NFT ID</option>';
 
             try {
                 const balance = Number(await contract.methods.balanceOf(addr).call());
@@ -172,17 +136,7 @@
                     ids.push(Number(id));
                 }
 
-                tokenIds = ids;
-
-                // 填充转账下拉
-                ids.forEach(id => {
-                    const option = document.createElement('option');
-                    option.value = id;
-                    option.textContent = `#${id}`;
-                    tokenSelect.appendChild(option);
-                });
-
-                // 依次加载
+                // 依次加载（保证顺序）
                 for (const id of ids) {
                     const uri = await contract.methods.tokenURI(id).call();
                     let imgUrl = uri;
@@ -212,12 +166,8 @@
                             <div class="mt-6">
                                 <h3 class="text-3xl font-bold text-secondary font-display">#${id}</h3>
                                 <button onclick="download(this)" data-url="${imgUrl}" data-id="${id}"
-                                        class="mt-4 px-8 py-3 bg-primary hover:bg-primary/90 rounded-full font-bold transition mr-2">
+                                        class="mt-4 px-8 py-3 bg-primary hover:bg-primary/90 rounded-full font-bold transition">
                                     下载原图 PNG
-                                </button>
-                                <button onclick="prepareTransfer(${id})" 
-                                        class="px-8 py-3 bg-secondary hover:bg-secondary/90 rounded-full font-bold text-dark transition">
-                                    转账此 NFT
                                 </button>
                             </div>
                         </div>
@@ -226,7 +176,6 @@
                 }
 
                 result.classList.remove('hidden');
-                transferSection.classList.remove('hidden');
             } catch (err) {
                 console.error(err);
                 alert('查询失败，请重试');
@@ -242,49 +191,6 @@
             a.href = url;
             a.download = `GPunks_${id}.png`;
             a.click();
-        }
-
-        function prepareTransfer(id) {
-            tokenSelect.value = id;
-            transferBtn.disabled = false;
-            transferTo.focus();
-        }
-
-        transferBtn.addEventListener('click', async () => {
-            const toAddr = web3.utils.toChecksumAddress(transferTo.value.trim());
-            const tokenId = Number(tokenSelect.value);
-            if (!toAddr || !tokenId) return alert('请填写目标地址和选择 NFT');
-
-            if (!window.ethereum) return alert('请安装 MetaMask 并连接钱包');
-
-            try {
-                await window.ethereum.request({ method: 'eth_requestAccounts' });
-                const accounts = await web3.eth.getAccounts();
-                currentAccount = accounts[0];
-
-                // 检查当前账户是否是 owner
-                const owner = await contract.methods.ownerOf(tokenId).call();
-                if (owner.toLowerCase() !== currentAccount.toLowerCase()) {
-                    return alert('当前钱包不是此 NFT 的拥有者，无法转账');
-                }
-
-                const gasEstimate = await contract.methods.safeTransferFrom(currentAccount, toAddr, tokenId).estimateGas({ from: currentAccount });
-                await contract.methods.safeTransferFrom(currentAccount, toAddr, tokenId).send({ 
-                    from: currentAccount, 
-                    gas: Math.floor(gasEstimate * 1.2) // 加 20% 缓冲
-                });
-
-                alert(`转账成功！NFT #${tokenId} 已发送到 ${toAddr}`);
-                query(); // 刷新列表
-            } catch (err) {
-                console.error(err);
-                alert(`转账失败: ${err.message}`);
-            }
-        });
-
-        // MetaMask 连接提示
-        if (window.ethereum) {
-            window.ethereum.on('accountsChanged', () => location.reload());
         }
     </script>
 </body>
