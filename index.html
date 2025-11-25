@@ -1,87 +1,147 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPunks NFT 查询（修复版）</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>GPunks 查询</title>
+    <link rel="icon" type="image/png" href="https://woofinglabs.github.io/GdogToTheMoon/images/gdog_logo.png" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Changa+One&display=swap" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0068FF',
+                        secondary: '#18E5A0',
+                        dark: '#070808',
+                        'light-gray': '#E5E7EB'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['Changa One', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body { background:#070808; color:white; font-family:system-ui,sans-serif; }
-        input::placeholder { color:#666; }
-        .nft-card img { max-width: 100%; height: auto; cursor: pointer; }
-        .download-btn { display: none; position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .nft-card { max-width: 100%; height: auto; cursor: pointer; }
+        .download-btn { display: none; position: absolute; top: 10px; right: 10px; background: rgba(0,104,255,0.8); color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; z-index: 10; }
         .nft-card:hover .download-btn { display: block; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
-    <header class="fixed top-0 w-full bg-black/80 backdrop-blur z-10 border-b border-blue-500/30">
-        <div class="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
-            <img src="https://woofinglabs.github.io/GdogToTheMoon/images/gdog_logo.png" class="w-10 h-10 rounded-full">
-            <h1 class="text-2xl font-bold text-blue-400">GPunks 查询器</h1>
+<body class="bg-dark text-white min-h-screen flex flex-col">
+
+    <header class="fixed top-0 left-0 right-0 z-50 bg-dark/90 backdrop-blur-md border-b border-primary/20">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="https://woofinglabs.github.io/GdogToTheMoon/images/gdog_logo.png" alt="GPunks" class="w-10 h-10 rounded-full" />
+                <span class="font-display text-3xl text-primary">GPunks</span>
+            </div>
         </div>
     </header>
 
-    <main class="flex-1 pt-20 pb-10 px-4">
-        <div class="max-w-6xl mx-auto">
-            <div class="bg-zinc-900 rounded-2xl p-6 mb-8 shadow-2xl border border-blue-500/30">
-                <div class="flex flex-col sm:flex-row gap-4">
-                    <input id="addr" type="text" placeholder="输入钱包地址 0x..." value="0x2E8A596cc7dB5Eb625fDaEdf7d396084B3E089d2" class="flex-1 px-5 py-4 bg-black/50 rounded-xl border border-blue-500/50 focus:border-green-400 outline-none text-lg">
-                    <button id="go" class="px-10 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-lg transition">查询</button>
+    <main class="flex-1 pt-24 pb-12 px-4">
+        <div class="container mx-auto max-w-5xl">
+            <div class="text-center mb-10">
+                <h1 class="font-display text-5xl md:text-6xl text-primary mb-3">GPunks NFT 查询</h1>
+                <p class="text-light-gray text-lg">输入钱包地址，查看持有的所有 GPunks（支持下载原图）</p>
+            </div>
+
+            <div class="max-w-2xl mx-auto mb-12">
+                <div class="bg-dark/50 border border-primary/30 rounded-2xl p-6">
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input 
+                            id="walletAddress" 
+                            type="text" 
+                            placeholder="输入钱包地址 0x..." 
+                            value="0x2E8A596cc7dB5Eb625fDaEdf7d396084B3E089d2"
+                            class="flex-1 px-5 py-4 bg-dark/80 border border-primary/30 rounded-xl text-white placeholder-light-gray/50 focus:outline-none focus:border-secondary transition"
+                        />
+                        <button 
+                            id="queryBtn" 
+                            class="px-8 py-4 bg-primary hover:bg-primary/80 rounded-xl font-medium transition whitespace-nowrap"
+                        >
+                            查询 NFT
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div id="loading" class="text-center text-gray-400 hidden">加载中...</div>
-            <div id="count" class="text-center text-2xl mb-6 hidden">
-                共持有 <span id="num" class="text-green-400 font-bold">0</span> 个 GPunks
+            <div id="loading" class="text-center text-light-gray hidden">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-secondary mx-auto mb-2"></div>
+                正在查询，请稍等...
             </div>
-            <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4"></div>
-            <div id="empty" class="text-center text-2xl text-gray-500 py-20 hidden">这个地址暂无 GPunks（总供应: <span id="totalSupply">0</span>）</div>
 
-            <details id="debug" class="mt-8 bg-black/50 p-4 rounded-xl border border-yellow-500/50 hidden">
-                <summary class="cursor-pointer text-yellow-400">调试信息（点击展开）</summary>
-                <pre class="text-xs bg-black/70 p-3 rounded text-green-300 overflow-auto max-h-60"></pre>
+            <div id="result" class="hidden">
+                <div class="text-center mb-8">
+                    <p class="text-2xl">共持有 <span id="totalCount" class="text-secondary font-bold">0</span> 个 GPunks</p>
+                </div>
+
+                <div id="nftGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <!-- NFT 将动态插入这里 -->
+                </div>
+
+                <div id="empty" class="text-center py-20 text-light-gray text-xl hidden">
+                    该地址暂无 GPunks NFT（总供应: <span id="totalSupply">0</span>）
+                </div>
+            </div>
+
+            <details id="debug" class="max-w-2xl mx-auto mt-8 bg-dark/50 p-4 rounded-xl border border-yellow-500/50 hidden">
+                <summary class="cursor-pointer text-yellow-400 text-center">调试信息（点击展开）</summary>
+                <pre class="text-xs bg-dark/70 p-3 rounded text-green-300 overflow-auto max-h-60"></pre>
             </details>
         </div>
     </main>
 
+    <footer class="bg-dark/95 py-6 border-t border-primary/20 text-center text-light-gray text-sm">
+        GPunks 合约: 0x145Af7ED86863F914652791b8A6028B92411baD4<br>
+        网络: GateLayer (Chain ID: 10008) · 数据实时查询
+    </footer>
+
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
     <script>
-        const CONTRACT = "0x145Af7ED86863F914652791b8A6028B92411baD4";
-        const FALLBACK_BASE = "https://bafybeiam2yfk274nkndkks33k7exisutily5h5msbtpqp3wyrlxg2x4q5q.ipfs.w3s.link/";
-        const web3 = new Web3("https://gatelayer-mainnet.gatenode.cc/");
-        const abi = [
-            {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"internalType":"string"}],"stateMutability":"view","type":"function"},
-            {"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenByIndex","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"}
-        ];
-        const nft = new web3.eth.Contract(abi, CONTRACT);
+        const CONTRACT_ADDRESS = '0x145Af7ED86863F914652791b8A6028B92411baD4';
+        const RPC_URL = 'https://gatelayer-mainnet.gatenode.cc/';
+        
+        const web3 = new Web3(RPC_URL);
+        const contract = new web3.eth.Contract([
+            {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenByIndex","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+        ], CONTRACT_ADDRESS);
 
-        const addrInput = document.getElementById("addr");
-        const goBtn = document.getElementById("go");
-        const loading = document.getElementById("loading");
-        const countDiv = document.getElementById("count");
-        const numSpan = document.getElementById("num");
-        const totalSupplySpan = document.getElementById("totalSupply");
-        const grid = document.getElementById("grid");
-        const empty = document.getElementById("empty");
-        const debugDetails = document.getElementById("debug");
-        const debugPre = debugDetails.querySelector("pre");
+        const queryBtn = document.getElementById('queryBtn');
+        const walletInput = document.getElementById('walletAddress');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const nftGrid = document.getElementById('nftGrid');
+        const totalCount = document.getElementById('totalCount');
+        const empty = document.getElementById('empty');
+        const totalSupplySpan = document.getElementById('totalSupply');
+        const debugDetails = document.getElementById('debug');
+        const debugPre = debugDetails.querySelector('pre');
 
-        addrInput.addEventListener("keypress", e => e.key === "Enter" && query());
-        goBtn.onclick = query;
+        // 允许回车查询
+        walletInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') queryNFTs();
+        });
+
+        queryBtn.addEventListener('click', queryNFTs);
 
         function logDebug(msg) {
             console.log(msg);
-            debugPre.textContent += msg + "\n";
+            debugPre.textContent += msg + '\n';
         }
 
         async function getImageUrl(tokenId) {
             try {
-                const uri = await nft.methods.tokenURI(tokenId).call({}); // 修复: 加 {} 处理 BigNumber
+                const uri = await contract.methods.tokenURI(tokenId).call();
                 logDebug(`Token ${tokenId} URI: ${uri}`);
-                if (!uri || uri === "") return null;
+                if (!uri || uri === '') return null;
 
                 let imgUrl = uri;
                 if (uri.endsWith('.json')) {
@@ -89,106 +149,135 @@
                     if (resp.ok) {
                         const meta = await resp.json();
                         imgUrl = meta.image;
-                        if (imgUrl?.startsWith("ipfs://")) {
-                            imgUrl = "https://ipfs.io/ipfs/" + imgUrl.slice(7);
+                        logDebug(`从 JSON 提取 image: ${imgUrl}`);
+                        if (imgUrl && imgUrl.startsWith('ipfs://')) {
+                            imgUrl = 'https://ipfs.io/ipfs/' + imgUrl.slice(7);
                         }
+                    } else {
+                        logDebug(`JSON fetch 失败: ${resp.status}`);
                     }
                 }
-                return imgUrl || `${FALLBACK_BASE}${tokenId}.png`;
+                return imgUrl || uri.replace(/\.json$/, '.png'); // 兜底替换
             } catch (e) {
-                logDebug(`URI 错误 ${tokenId}: ${e.message}`);
-                return `${FALLBACK_BASE}${tokenId}.png`;
+                logDebug(`getImageUrl 错误 ${tokenId}: ${e.message}`);
+                return null;
             }
         }
 
-        async function query() {
-            let address = addrInput.value.trim();
-            if (!web3.utils.isAddress(address)) return alert("地址格式错误");
+        function downloadImage(imgSrc, tokenId) {
+            const a = document.createElement('a');
+            a.href = imgSrc;
+            a.download = `GPunks_${tokenId}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        async function queryNFTs() {
+            let address = walletInput.value.trim();
+            if (!address) return alert('请输入钱包地址');
+            if (!web3.utils.isAddress(address)) return alert('地址格式不正确');
+
             address = web3.utils.toChecksumAddress(address);
 
-            loading.classList.remove("hidden");
-            grid.innerHTML = "";
-            countDiv.classList.add("hidden");
-            empty.classList.add("hidden");
-            debugPre.textContent = "";
-            debugDetails.classList.add("hidden");
+            // 重置状态
+            loading.classList.remove('hidden');
+            result.classList.add('hidden');
+            nftGrid.innerHTML = '';
+            empty.classList.add('hidden');
+            debugPre.textContent = '';
+            debugDetails.classList.add('hidden');
 
             try {
                 logDebug(`查询地址: ${address}`);
-                const balance = Number(await nft.methods.balanceOf(address).call({}));
-                logDebug(`Balance: ${balance}`);
+                const balance = await contract.methods.balanceOf(address).call();
+                const count = Number(balance);
+                logDebug(`BalanceOf: ${count}`);
 
-                const totalSupply = Number(await nft.methods.totalSupply().call({}));
-                totalSupplySpan.textContent = totalSupply;
+                const totalSupply = await contract.methods.totalSupply().call();
+                totalSupplySpan.textContent = Number(totalSupply);
                 logDebug(`总供应: ${totalSupply}`);
 
-                let tokenIds = [];
-                if (balance > 0) {
-                    // 用户特定 NFT
-                    for (let i = 0; i < balance; i++) {
-                        const id = Number(await nft.methods.tokenOfOwnerByIndex(address, i).call({}));
-                        tokenIds.push(id);
-                        logDebug(`用户 Token ${i}: ${id}`);
+                totalCount.textContent = count;
+
+                if (count === 0) {
+                    if (Number(totalSupply) === 0) {
+                        logDebug('合约无 NFT，已 mint 0 个');
+                    } else {
+                        logDebug('用户无 NFT，但合约有总供应');
                     }
-                } else if (totalSupply > 0) {
-                    // fallback: 显示所有 NFT
-                    logDebug("用户无 NFT，显示所有...");
-                    for (let i = 0; i < totalSupply; i++) {
-                        const id = Number(await nft.methods.tokenByIndex(i).call({}));
-                        tokenIds.push(id);
-                    }
-                } else {
-                    throw "no nfts";
+                    empty.classList.remove('hidden');
+                    result.classList.remove('hidden');
+                    debugDetails.classList.remove('hidden');
+                    return;
                 }
 
-                numSpan.textContent = tokenIds.length;
-                countDiv.classList.remove("hidden");
-
-                for (const id of tokenIds) {
-                    const imgUrl = await getImageUrl(id);
-                    const card = document.createElement("div");
-                    card.className = "nft-card relative bg-zinc-800 rounded-xl overflow-hidden border border-blue-500/30 hover:border-green-400 transition-all";
-                    card.innerHTML = `
-                        <img id="img-${id}" src="${imgUrl}" alt="GPunks #${id}" loading="lazy" class="nft-card img" onerror="this.src='https://via.placeholder.com/300x300/111827/ffffff?text=%23${id}'; this.onerror=null;">
-                        <button class="download-btn" onclick="downloadImage(${id})">下载 PNG</button>
-                        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-center opacity-0 hover:opacity-100 transition">
-                            <span class="font-bold text-lg block">#${id}</span>
-                            <span class="text-xs text-gray-300">点击保存</span>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-
-                    // 动态调整大小 + 下载事件
-                    const img = document.getElementById(`img-${id}`);
-                    img.onload = () => {
-                        card.style.width = img.naturalWidth + 'px';
-                        card.style.height = img.naturalHeight + 'px';
-                        card.style.maxWidth = '100%';
-                    };
-                    img.onclick = () => downloadImage(id);
+                const promises = [];
+                for (let i = 0; i < count; i++) {
+                    promises.push(contract.methods.tokenOfOwnerByIndex(address, i).call());
                 }
 
-                debugDetails.classList.remove("hidden");
+                const tokenIds = await Promise.all(promises);
+                logDebug(`Token IDs: ${tokenIds.join(', ')}`);
+                
+                // 并发获取图片
+                const tokenPromises = tokenIds.map(async (id) => {
+                    const imgUrl = await getImageUrl(Number(id));
+                    return { id: Number(id), imgUrl };
+                });
 
-            } catch (e) {
-                logDebug(`错误: ${e.message}`);
-                empty.classList.remove("hidden");
-                debugDetails.classList.remove("hidden");
+                const tokens = await Promise.all(tokenPromises);
+
+                // 渲染 NFT
+                tokens.forEach(token => {
+                    const div = document.createElement('div');
+                    div.className = 'relative group cursor-pointer transform transition hover:scale-105 nft-card overflow-hidden rounded-xl border-2 border-primary/30 bg-dark/80';
+
+                    if (token.imgUrl) {
+                        div.innerHTML = `
+                            <img src="${token.imgUrl}" alt="GPunks #${token.id}" 
+                                 class="nft-card" 
+                                 onload="this.style.opacity=1; this.parentElement.style.width=this.naturalWidth+'px'; this.parentElement.style.height=this.naturalHeight+'px';"
+                                 onerror="this.src='https://via.placeholder.com/500x500/1a1a1a/ffffff?text=GPunks%20%23${token.id}'; this.onerror=null;"
+                                 style="opacity:0; transition:opacity 0.5s; max-width:100%; height:auto;"
+                                 onclick="downloadImage('${token.imgUrl}', ${token.id})">
+                            <button class="download-btn" onclick="event.stopPropagation(); downloadImage('${token.imgUrl}', ${token.id})">下载 PNG</button>
+                            <div class="p-2 text-center bg-gradient-to-t from-black/70 to-transparent absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100 transition">
+                                <p class="font-bold text-lg">#${token.id}</p>
+                                <p class="text-xs text-secondary">点击图片保存</p>
+                            </div>
+                        `;
+                    } else {
+                        div.innerHTML = `
+                            <div class="w-full h-64 flex items-center justify-center bg-gray-900 rounded">
+                                <div class="text-center">
+                                    <p class="text-3xl font-bold text-secondary">#${token.id}</p>
+                                    <p class="text-xs text-light-gray mt-2">图片加载失败</p>
+                                </div>
+                            </div>
+                            <div class="p-2 text-center absolute bottom-0 left-0 right-0">
+                                <p class="font-bold text-lg">#${token.id}</p>
+                            </div>
+                        `;
+                    }
+
+                    nftGrid.appendChild(div);
+                });
+
+                result.classList.remove('hidden');
+                debugDetails.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                logDebug(`查询错误: ${err.message}`);
+                alert('查询失败，请检查地址或网络（调试面板有详情）');
+                debugDetails.classList.remove('hidden');
             } finally {
-                loading.classList.add("hidden");
+                loading.classList.add('hidden');
             }
         }
 
-        function downloadImage(id) {
-            const img = document.getElementById(`img-${id}`);
-            const a = document.createElement('a');
-            a.href = img.src;
-            a.download = `GPunks_${id}.png`;
-            a.click();
-        }
-
-        // 自动查询
-        window.onload = query;
+        // 页面加载自动查询默认地址
+        window.addEventListener('load', queryNFTs);
     </script>
 </body>
 </html>
