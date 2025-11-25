@@ -3,29 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPunks 查询器（调试版）</title>
+    <title>GPunks NFT 查询（修复版）</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background:#070808; color:white; font-family:system-ui,sans-serif; }
         input::placeholder { color:#666; }
-        #debug { max-height: 300px; overflow-y: auto; }
+        .nft-card img { max-width: 100%; height: auto; cursor: pointer; }
+        .download-btn { display: none; position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .nft-card:hover .download-btn { display: block; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
     <header class="fixed top-0 w-full bg-black/80 backdrop-blur z-10 border-b border-blue-500/30">
         <div class="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
             <img src="https://woofinglabs.github.io/GdogToTheMoon/images/gdog_logo.png" class="w-10 h-10 rounded-full">
-            <h1 class="text-2xl font-bold text-blue-400">GPunks 查询器（调试）</h1>
+            <h1 class="text-2xl font-bold text-blue-400">GPunks 查询器</h1>
         </div>
     </header>
 
     <main class="flex-1 pt-20 pb-10 px-4">
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-6xl mx-auto">
             <div class="bg-zinc-900 rounded-2xl p-6 mb-8 shadow-2xl border border-blue-500/30">
                 <div class="flex flex-col sm:flex-row gap-4">
-                    <input id="addr" type="text" placeholder="输入钱包地址 0x..." class="flex-1 px-5 py-4 bg-black/50 rounded-xl border border-blue-500/50 focus:border-green-400 outline-none text-lg">
-                    <button id="go" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-lg transition mr-2">查询</button>
-                    <button id="debugBtn" class="px-8 py-4 bg-gray-600 hover:bg-gray-500 rounded-xl font-bold text-lg transition">调试</button>
+                    <input id="addr" type="text" placeholder="输入钱包地址 0x..." value="0x2E8A596cc7dB5Eb625fDaEdf7d396084B3E089d2" class="flex-1 px-5 py-4 bg-black/50 rounded-xl border border-blue-500/50 focus:border-green-400 outline-none text-lg">
+                    <button id="go" class="px-10 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-lg transition">查询</button>
                 </div>
             </div>
 
@@ -33,13 +34,13 @@
             <div id="count" class="text-center text-2xl mb-6 hidden">
                 共持有 <span id="num" class="text-green-400 font-bold">0</span> 个 GPunks
             </div>
-            <div id="grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-5"></div>
-            <div id="empty" class="text-center text-2xl text-gray-500 py-20 hidden">这个地址没有 GPunks（或未 mint）</div>
+            <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4"></div>
+            <div id="empty" class="text-center text-2xl text-gray-500 py-20 hidden">这个地址暂无 GPunks（总供应: <span id="totalSupply">0</span>）</div>
 
-            <div id="debugPanel" class="hidden mt-8 bg-black/50 p-4 rounded-xl border border-yellow-500/50">
-                <h3 class="text-yellow-400 mb-2">调试信息：</h3>
-                <pre id="debug" class="text-xs bg-black/70 p-3 rounded text-green-300"></pre>
-            </div>
+            <details id="debug" class="mt-8 bg-black/50 p-4 rounded-xl border border-yellow-500/50 hidden">
+                <summary class="cursor-pointer text-yellow-400">调试信息（点击展开）</summary>
+                <pre class="text-xs bg-black/70 p-3 rounded text-green-300 overflow-auto max-h-60"></pre>
+            </details>
         </div>
     </main>
 
@@ -52,135 +53,142 @@
             {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"internalType":"string"}],"stateMutability":"view","type":"function"},
-            {"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"}
+            {"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenByIndex","outputs":[{"internalType":"uint256"}],"stateMutability":"view","type":"function"}
         ];
         const nft = new web3.eth.Contract(abi, CONTRACT);
 
         const addrInput = document.getElementById("addr");
         const goBtn = document.getElementById("go");
-        const debugBtn = document.getElementById("debugBtn");
         const loading = document.getElementById("loading");
         const countDiv = document.getElementById("count");
         const numSpan = document.getElementById("num");
+        const totalSupplySpan = document.getElementById("totalSupply");
         const grid = document.getElementById("grid");
         const empty = document.getElementById("empty");
-        const debugPanel = document.getElementById("debugPanel");
-        const debugPre = document.getElementById("debug");
+        const debugDetails = document.getElementById("debug");
+        const debugPre = debugDetails.querySelector("pre");
 
         addrInput.addEventListener("keypress", e => e.key === "Enter" && query());
         goBtn.onclick = query;
-        debugBtn.onclick = () => debugPanel.classList.toggle("hidden");
 
-        async function logDebug(msg) {
+        function logDebug(msg) {
             console.log(msg);
             debugPre.textContent += msg + "\n";
         }
 
+        async function getImageUrl(tokenId) {
+            try {
+                const uri = await nft.methods.tokenURI(tokenId).call({}); // 修复: 加 {} 处理 BigNumber
+                logDebug(`Token ${tokenId} URI: ${uri}`);
+                if (!uri || uri === "") return null;
+
+                let imgUrl = uri;
+                if (uri.endsWith('.json')) {
+                    const resp = await fetch(uri);
+                    if (resp.ok) {
+                        const meta = await resp.json();
+                        imgUrl = meta.image;
+                        if (imgUrl?.startsWith("ipfs://")) {
+                            imgUrl = "https://ipfs.io/ipfs/" + imgUrl.slice(7);
+                        }
+                    }
+                }
+                return imgUrl || `${FALLBACK_BASE}${tokenId}.png`;
+            } catch (e) {
+                logDebug(`URI 错误 ${tokenId}: ${e.message}`);
+                return `${FALLBACK_BASE}${tokenId}.png`;
+            }
+        }
+
         async function query() {
             let address = addrInput.value.trim();
-            if (!address) address = "合约 owner"; // 默认测试 owner
             if (!web3.utils.isAddress(address)) return alert("地址格式错误");
-
             address = web3.utils.toChecksumAddress(address);
 
             loading.classList.remove("hidden");
             grid.innerHTML = "";
             countDiv.classList.add("hidden");
             empty.classList.add("hidden");
-            debugPre.textContent = ""; // 清空调试
-            debugPanel.classList.add("hidden");
+            debugPre.textContent = "";
+            debugDetails.classList.add("hidden");
 
             try {
                 logDebug(`查询地址: ${address}`);
-                const balance = Number(await nft.methods.balanceOf(address).call());
-                logDebug(`BalanceOf: ${balance}`);
+                const balance = Number(await nft.methods.balanceOf(address).call({}));
+                logDebug(`Balance: ${balance}`);
 
-                const totalSupply = await nft.methods.totalSupply().call();
-                logDebug(`合约总供应: ${totalSupply}`);
+                const totalSupply = Number(await nft.methods.totalSupply().call({}));
+                totalSupplySpan.textContent = totalSupply;
+                logDebug(`总供应: ${totalSupply}`);
 
-                if (balance === 0) throw "no nft";
+                let tokenIds = [];
+                if (balance > 0) {
+                    // 用户特定 NFT
+                    for (let i = 0; i < balance; i++) {
+                        const id = Number(await nft.methods.tokenOfOwnerByIndex(address, i).call({}));
+                        tokenIds.push(id);
+                        logDebug(`用户 Token ${i}: ${id}`);
+                    }
+                } else if (totalSupply > 0) {
+                    // fallback: 显示所有 NFT
+                    logDebug("用户无 NFT，显示所有...");
+                    for (let i = 0; i < totalSupply; i++) {
+                        const id = Number(await nft.methods.tokenByIndex(i).call({}));
+                        tokenIds.push(id);
+                    }
+                } else {
+                    throw "no nfts";
+                }
 
-                numSpan.textContent = balance;
+                numSpan.textContent = tokenIds.length;
                 countDiv.classList.remove("hidden");
 
-                const ids = [];
-                for (let i = 0; i < balance; i++) {
-                    const id = await nft.methods.tokenOfOwnerByIndex(address, i).call();
-                    ids.push(id);
-                    logDebug(`Token ID ${i}: ${id}`);
-                }
-
-                for (const id of ids) {
-                    const uri = await nft.methods.tokenURI(id).call();
-                    logDebug(`TokenURI(${id}): ${uri}`);
-
-                    let imgUrl = "";
-                    try {
-                        if (uri && uri !== "") {
-                            if (uri.endsWith('.json')) {
-                                const resp = await fetch(uri);
-                                if (resp.ok) {
-                                    const meta = await resp.json();
-                                    imgUrl = meta.image;
-                                    logDebug(`从 JSON 提取 image: ${imgUrl}`);
-                                    if (imgUrl.startsWith("ipfs://")) {
-                                        imgUrl = "https://ipfs.io/ipfs/" + imgUrl.slice(7);
-                                    }
-                                }
-                            } else {
-                                imgUrl = uri;
-                            }
-                        }
-                    } catch (e) { 
-                        logDebug(`JSON fetch 失败: ${e.message}`);
-                    }
-
-                    // 兜底：用 fallback baseURI
-                    if (!imgUrl) {
-                        imgUrl = `${FALLBACK_BASE}${id}.json`; // 或 .png，根据需要
-                        logDebug(`使用兜底 URI: ${imgUrl}`);
-                    }
-
-                    const div = document.createElement("div");
-                    div.className = "relative group overflow-hidden rounded-xl border border-blue-500/30 hover:border-green-400 transition-all aspect-square";
-                    div.innerHTML = `
-                        <img src="${imgUrl}" alt="GPunks #${id}" loading="lazy"
-                             class="w-full h-full object-cover bg-gray-900"
-                             onerror="this.src='https://via.placeholder.com/500x500/111827/ffffff?text=%23${id}'; this.onerror=null;"
-                             onclick="window.open('${imgUrl}', '_blank')">
-                        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-center opacity-0 group-hover:opacity-100 transition">
-                            <span class="font-bold text-lg">#${id}</span>
-                            <button class="text-xs bg-blue-500 px-2 py-1 rounded mt-1" onclick="event.stopPropagation(); window.open('${imgUrl}', '_blank')">查看 JSON</button>
+                for (const id of tokenIds) {
+                    const imgUrl = await getImageUrl(id);
+                    const card = document.createElement("div");
+                    card.className = "nft-card relative bg-zinc-800 rounded-xl overflow-hidden border border-blue-500/30 hover:border-green-400 transition-all";
+                    card.innerHTML = `
+                        <img id="img-${id}" src="${imgUrl}" alt="GPunks #${id}" loading="lazy" class="nft-card img" onerror="this.src='https://via.placeholder.com/300x300/111827/ffffff?text=%23${id}'; this.onerror=null;">
+                        <button class="download-btn" onclick="downloadImage(${id})">下载 PNG</button>
+                        <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3 text-center opacity-0 hover:opacity-100 transition">
+                            <span class="font-bold text-lg block">#${id}</span>
+                            <span class="text-xs text-gray-300">点击保存</span>
                         </div>
                     `;
-                    grid.appendChild(div);
+                    grid.appendChild(card);
+
+                    // 动态调整大小 + 下载事件
+                    const img = document.getElementById(`img-${id}`);
+                    img.onload = () => {
+                        card.style.width = img.naturalWidth + 'px';
+                        card.style.height = img.naturalHeight + 'px';
+                        card.style.maxWidth = '100%';
+                    };
+                    img.onclick = () => downloadImage(id);
                 }
 
-                // 显示调试
-                debugPanel.classList.remove("hidden");
+                debugDetails.classList.remove("hidden");
 
             } catch (e) {
-                console.error(e);
                 logDebug(`错误: ${e.message}`);
                 empty.classList.remove("hidden");
-                debugPanel.classList.remove("hidden");
+                debugDetails.classList.remove("hidden");
             } finally {
                 loading.classList.add("hidden");
             }
         }
 
-        // 页面加载时自动查询 totalSupply
-        window.onload = () => {
-            queryWithOwner();
-        };
-
-        async function queryWithOwner() {
-            try {
-                const owner = await nft.methods.owner().call(); // 加 owner ABI 如果需要
-                addrInput.value = owner;
-                await query();
-            } catch (e) {}
+        function downloadImage(id) {
+            const img = document.getElementById(`img-${id}`);
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = `GPunks_${id}.png`;
+            a.click();
         }
+
+        // 自动查询
+        window.onload = query;
     </script>
 </body>
 </html>
