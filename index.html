@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>GPunks 查询</title>
+    <link rel="icon" type="image/png" href="https://woofinglabs.github.io/GdogToTheMoon/images/gdog_logo.png" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Changa+One&display=swap" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0068FF',
+                        secondary: '#18E5A0',
+                        dark: '#070808',
+                        'light-gray': '#E5E7EB'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['Changa One', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-dark text-white min-h-screen flex flex-col">
+
+    <header class="fixed top-0 left-0 right-0 z-50 bg-dark/90 backdrop-blur-md border-b border-primary/20">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="https://woofinglabs.github.io/GdogToTheMoon/images/gdog_logo.png" alt="GPunks" class="w-10 h-10 rounded-full" />
+                <span class="font-display text-3xl text-primary">GPunks</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 pt-24 pb-12 px-4">
+        <div class="container mx-auto max-w-5xl">
+            <div class="text-center mb-10">
+                <h1 class="font-display text-5xl md:text-6xl text-primary mb-3">GPunks NFT 查询</h1>
+                <p class="text-light-gray text-lg">输入钱包地址，查看持有的所有 GPunks</p>
+            </div>
+
+            <div class="max-w-2xl mx-auto mb-12">
+                <div class="bg-dark/50 border border-primary/30 rounded-2xl p-6">
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input 
+                            id="walletAddress" 
+                            type="text" 
+                            placeholder="输入钱包地址 0x..." 
+                            class="flex-1 px-5 py-4 bg-dark/80 border border-primary/30 rounded-xl text-white placeholder-light-gray/50 focus:outline-none focus:border-secondary transition"
+                        />
+                        <button 
+                            id="queryBtn" 
+                            class="px-8 py-4 bg-primary hover:bg-primary/80 rounded-xl font-medium transition whitespace-nowrap"
+                        >
+                            查询 NFT
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="loading" class="text-center text-light-gray hidden">
+                正在查询，请稍等...
+            </div>
+
+            <div id="result" class="hidden">
+                <div class="text-center mb-8">
+                    <p class="text-2xl">共持有 <span id="totalCount" class="text-secondary font-bold">0</span> 个 GPunks</p>
+                </div>
+
+                <div id="nftGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <!-- NFT 将动态插入这里 -->
+                </div>
+
+                <div id="empty" class="text-center py-20 text-light-gray text-xl hidden">
+                    该地址暂无 GPunks NFT
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-dark/95 py-6 border-t border-primary/20 text-center text-light-gray text-sm">
+        GPunks 合约: 0x145Af7ED86863F914652791b8A6028B92411baD4<br>
+        网络: GateLayer (Chain ID: 10008) · 数据实时查询
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
+    <script>
+        const CONTRACT_ADDRESS = '0x145Af7ED86863F914652791b8A6028B92411baD4';
+        const RPC_URL = 'https://gatelayer-mainnet.gatenode.cc/';
+        
+        const web3 = new Web3(RPC_URL);
+        const contract = new web3.eth.Contract([
+            {"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenByIndex","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenURI","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}
+        ], CONTRACT_ADDRESS);
+
+        const queryBtn = document.getElementById('queryBtn');
+        const walletInput = document.getElementById('walletAddress');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const nftGrid = document.getElementById('nftGrid');
+        const totalCount = document.getElementById('totalCount');
+        const empty = document.getElementById('empty');
+
+        // 允许回车查询
+        walletInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') queryNFTs();
+        });
+
+        queryBtn.addEventListener('click', queryNFTs);
+
+        async function queryNFTs() {
+            let address = walletInput.value.trim();
+            if (!address) return alert('请输入钱包地址');
+            if (!web3.utils.isAddress(address)) return alert('地址格式不正确');
+
+            address = web3.utils.toChecksumAddress(address);
+
+            // 重置状态
+            loading.classList.remove('hidden');
+            result.classList.add('hidden');
+            nftGrid.innerHTML = '';
+            empty.classList.add('hidden');
+
+            try {
+                const balance = await contract.methods.balanceOf(address).call();
+                const count = Number(balance);
+
+                totalCount.textContent = count;
+
+                if (count === 0) {
+                    empty.classList.remove('hidden');
+                    result.classList.remove('hidden');
+                    loading.classList.add('hidden');
+                    return;
+                }
+
+                const promises = [];
+                for (let i = 0; i < count; i++) {
+                    promises.push(
+                        contract.methods.tokenOfOwnerByIndex(address, i).call()
+                    );
+                }
+
+                const tokenIds = await Promise.all(promises);
+                
+                // 并发获取所有 tokenURI
+                const uriPromises = tokenIds.map(id => 
+                    contract.methods.tokenURI(id).call()
+                        .then(uri => ({ id: Number(id), uri }))
+                        .catch(() => ({ id: Number(id), uri: null }))
+                );
+
+                const tokens = await Promise.all(uriPromises);
+
+                // 渲染 NFT
+                tokens.forEach(token => {
+                    const div = document.createElement('div');
+                    div.className = 'relative group cursor-pointer transform transition hover:scale-105';
+
+                    if (token.uri) {
+                        // 兼容 ipfs:// 和 https://
+                        let imageUrl = token.uri;
+                        if (imageUrl.startsWith('ipfs://')) {
+                            imageUrl = 'https://ipfs.io/ipfs/' + imageUrl.slice(7);
+                        }
+                        if (imageUrl.endsWith('.json')) {
+                            // 如果是 .json 元数据链接，尝试替换为图片（常见于 baseURI 模式）
+                            imageUrl = imageUrl.replace(/\.json$/, '.png');
+                        }
+
+                        div.innerHTML = `
+                            <div class="bg-dark/80 border-2 border-primary/30 rounded-xl overflow-hidden">
+                                <img src="${imageUrl}" alt="GPunks #${token.id}" 
+                                     class="w-full h-full object-cover bg-gray-900"
+                                     onload="this.style.opacity=1" 
+                                     onerror="this.src='https://via.placeholder.com/500x500/1a1a1a/ffffff?text=GPunks%20%23${token.id}'"
+                                     style="opacity:0; transition:opacity 0.5s; width:500px; height:500px;">
+                                <div class="p-2 text-center bg-gradient-to-t from-black/70 to-transparent absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100 transition">
+                                    <p class="font-bold text-lg">#${token.id}</p>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        div.innerHTML = `
+                            <div class="bg-dark/80 border-2 border-primary/30 rounded-xl flex items-center justify-center h-full">
+                                <div class="text-center">
+                                    <p class="text-3xl font-bold text-secondary">#${token.id}</p>
+                                    <p class="text-xs text-light-gray mt-2">图片加载失败</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    nftGrid.appendChild(div);
+                });
+
+                result.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                alert('查询失败，请检查地址或网络是否正常');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
